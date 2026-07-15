@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>7-Day Habit Tracker</title>
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: #f2f2f7;
+            color: #1c1c1e;
+            padding: 20px 10px;
+            padding-top: env(safe-area-inset-top, 20px);
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        button.reset-btn {
+            background-color: #ff3b30;
+            color: white;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        .habit-card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .habit-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .habit-title {
+            font-weight: 600;
+            font-size: 16px;
+        }
+
+        .delete-btn {
+            background: none;
+            border: none;
+            color: #8e8e93;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .grid-7 {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+        }
+
+        .day-column {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .day-label {
+            font-size: 11px;
+            color: #8e8e93;
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
+
+        .checkbox {
+            width: 100%;
+            aspect-ratio: 1;
+            border: 2px solid #e5e5ea;
+            border-radius: 8px;
+            background-color: #f2f2f7;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            font-weight: bold;
+            color: white;
+            transition: all 0.15s ease;
+        }
+
+        .checkbox.checked {
+            background-color: #34c759;
+            border-color: #34c759;
+        }
+
+        .add-habit-form {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .add-habit-form input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #d1d1d6;
+            border-radius: 10px;
+            font-size: 16px;
+            outline: none;
+        }
+
+        .add-btn {
+            background-color: #007aff;
+            color: white;
+            border: none;
+            padding: 0 20px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>My Habits</h1>
+        <button class="reset-btn" onclick="resetWeeklyData()">Reset Week</button>
+    </header>
+
+    <div id="habitList"></div>
+
+    <form class="add-habit-form" onsubmit="addHabit(event)">
+        <input type="text" id="newHabitInput" placeholder="New habit name..." required autocomplete="off">
+        <button type="submit" class="add-btn">Add</button>
+    </form>
+</div>
+
+<script>
+    const DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+    let habits = JSON.parse(localStorage.getItem('offline_habits')) || [];
+
+    function saveState() {
+        localStorage.setItem('offline_habits', JSON.stringify(habits));
+    }
+
+    function render() {
+        const listContainer = document.getElementById('habitList');
+        listContainer.innerHTML = '';
+
+        habits.forEach((habit, habitIndex) => {
+            const card = document.createElement('div');
+            card.className = 'habit-card';
+
+            const header = document.createElement('div');
+            header.className = 'habit-header';
+            header.innerHTML = `
+                <span class="habit-title">${habit.name}</span>
+                <button class="delete-btn" onclick="deleteHabit(${habitIndex})">Delete</button>
+            `;
+            card.appendChild(header);
+
+            const grid = document.createElement('div');
+            grid.className = 'grid-7';
+
+            DAYS.forEach((dayLabel, dayIndex) => {
+                const dayCol = document.createElement('div');
+                dayCol.className = 'day-column';
+
+                const label = document.createElement('span');
+                label.className = 'day-label';
+                label.innerText = dayLabel;
+
+                const box = document.createElement('div');
+                const isChecked = habit.history[dayIndex];
+                box.className = `checkbox ${isChecked ? 'checked' : ''}`;
+                box.innerText = isChecked ? '✓' : '';
+                box.onclick = () => toggleDay(habitIndex, dayIndex);
+
+                dayCol.appendChild(label);
+                dayCol.appendChild(box);
+                grid.appendChild(dayCol);
+            });
+
+            card.appendChild(grid);
+            listContainer.appendChild(card);
+        });
+    }
+
+    function addHabit(event) {
+        event.preventDefault();
+        const input = document.getElementById('newHabitInput');
+        const name = input.value.trim();
+        
+        if (name) {
+            habits.push({
+                name: name,
+                history: [false, false, false, false, false, false, false]
+            });
+            input.value = '';
+            saveState();
+            render();
+        }
+    }
+
+    function deleteHabit(index) {
+        if (confirm("Are you sure you want to delete this habit?")) {
+            habits.splice(index, 1);
+            saveState();
+            render();
+        }
+    }
+
+    function toggleDay(habitIndex, dayIndex) {
+        habits[habitIndex].history[dayIndex] = !habits[habitIndex].history[dayIndex];
+        saveState();
+        render();
+    }
+
+    function resetWeeklyData() {
+        if (confirm("Reset all checked days for the week?")) {
+            habits.forEach(habit => {
+                habit.history = [false, false, false, false, false, false, false];
+            });
+            saveState();
+            render();
+        }
+    }
+
+    render();
+</script>
+</body>
+</html>
