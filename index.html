@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>7-Day Habit Tracker</title>
     
+    <!-- Native iOS Full-Screen Mode Meta Tags -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     
@@ -49,6 +50,13 @@
             border-radius: 8px;
             font-weight: 600;
             font-size: 13px;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin: 30px 0 10px 0;
+            color: #3a3a3c;
         }
 
         .habit-card {
@@ -118,6 +126,50 @@
             border-color: #34c759;
         }
 
+        /* Styles for archived items (read-only, slightly grayed out) */
+        .archive-card {
+            background: #ffffff;
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 10px;
+            border-left: 4px solid #007aff;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+        }
+
+        .archive-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            color: #8e8e93;
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
+
+        .archive-habit-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1c1c1e;
+            margin-bottom: 8px;
+        }
+
+        .archive-checkbox {
+            width: 100%;
+            aspect-ratio: 1;
+            border: 1px solid #e5e5ea;
+            border-radius: 6px;
+            background-color: #f2f2f7;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: white;
+        }
+
+        .archive-checkbox.checked {
+            background-color: #34c759;
+            border-color: #34c759;
+        }
+
         .add-habit-form {
             display: flex;
             gap: 10px;
@@ -142,6 +194,16 @@
             font-weight: 600;
             font-size: 16px;
         }
+
+        .clear-archive-btn {
+            background: none;
+            border: none;
+            color: #ff3b30;
+            font-size: 12px;
+            margin-top: 10px;
+            cursor: pointer;
+            float: right;
+        }
     </style>
 </head>
 <body>
@@ -149,26 +211,44 @@
 <div class="container">
     <header>
         <h1>My Habits</h1>
-        <button class="reset-btn" onclick="resetWeeklyData()">Reset Week</button>
+        <button class="reset-btn" onclick="archiveAndResetWeek()">Reset Week</button>
     </header>
 
+    <!-- Active Tracker Section -->
     <div id="habitList"></div>
 
     <form class="add-habit-form" onsubmit="addHabit(event)">
         <input type="text" id="newHabitInput" placeholder="New habit name..." required autocomplete="off">
         <button type="submit" class="add-btn">Add</button>
     </form>
+
+    <hr style="border: 0; height: 1px; background: #d1d1d6; margin-top: 30px;">
+
+    <!-- Historical Archive Section -->
+    <div class="section-title">History Logs</div>
+    <div id="archiveList"></div>
+    <button class="clear-archive-btn" onclick="clearAllArchive()">Clear History Logs</button>
 </div>
 
 <script>
     const DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+    
+    // Load existing data or initialize structural arrays
     let habits = JSON.parse(localStorage.getItem('offline_habits')) || [];
+    let archive = JSON.parse(localStorage.getItem('offline_habits_archive')) || [];
 
     function saveState() {
         localStorage.setItem('offline_habits', JSON.stringify(habits));
+        localStorage.setItem('offline_habits_archive', JSON.stringify(archive));
+    }
+
+    // Formats today's date into a clean string
+    function getFormattedDate(dateObj) {
+        return dateObj.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
     }
 
     function render() {
+        // --- 1. RENDER ACTIVE TRACKER ---
         const listContainer = document.getElementById('habitList');
         listContainer.innerHTML = '';
 
@@ -209,6 +289,57 @@
             card.appendChild(grid);
             listContainer.appendChild(card);
         });
+
+        // --- 2. RENDER HISTORICAL ARCHIVE ---
+        const archiveContainer = document.getElementById('archiveList');
+        archiveContainer.innerHTML = '';
+
+        if (archive.length === 0) {
+            archiveContainer.innerHTML = '<p style="color: #8e8e93; font-style: italic; font-size: 14px;">No archived weeks yet.</p>';
+        } else {
+            // Show newest archives first
+            [...archive].reverse().forEach((archivedWeek) => {
+                const aCard = document.createElement('div');
+                aCard.className = 'archive-card';
+
+                const aHeader = document.createElement('div');
+                aHeader.className = 'archive-header';
+                aHeader.innerHTML = `
+                    <span>Week ending: ${archivedWeek.dateRange}</span>
+                    <span>Score: ${archivedWeek.score}</span>
+                `;
+                aCard.appendChild(aHeader);
+
+                const aName = document.createElement('div');
+                aName.className = 'archive-habit-name';
+                aName.innerText = archivedWeek.name;
+                aCard.appendChild(aName);
+
+                const grid = document.createElement('div');
+                grid.className = 'grid-7';
+
+                DAYS.forEach((dayLabel, dayIndex) => {
+                    const dayCol = document.createElement('div');
+                    dayCol.className = 'day-column';
+
+                    const label = document.createElement('span');
+                    label.className = 'day-label';
+                    label.innerText = dayLabel;
+
+                    const box = document.createElement('div');
+                    const isChecked = archivedWeek.history[dayIndex];
+                    box.className = `archive-checkbox ${isChecked ? 'checked' : ''}`;
+                    box.innerText = isChecked ? '✓' : '';
+
+                    dayCol.appendChild(label);
+                    dayCol.appendChild(box);
+                    grid.appendChild(dayCol);
+                });
+
+                aCard.appendChild(grid);
+                archiveContainer.appendChild(aCard);
+            });
+        }
     }
 
     function addHabit(event) {
@@ -241,16 +372,46 @@
         render();
     }
 
-    function resetWeeklyData() {
-        if (confirm("Reset all checked days for the week?")) {
+    // The New Option B Engine
+    function archiveAndResetWeek() {
+        if (habits.length === 0) {
+            alert("No active habits to reset.");
+            return;
+        }
+
+        if (confirm("Archive current progress and reset active board for a new week?")) {
+            const todayStr = getFormattedDate(new Date());
+
+            // Loop and save each habit into the archive schema before clearing
             habits.forEach(habit => {
+                // Calculate completion efficiency metric (e.g., "4/7")
+                const totalChecked = habit.history.filter(Boolean).length;
+                
+                archive.push({
+                    name: habit.name,
+                    dateRange: todayStr,
+                    history: [...habit.history],
+                    score: `${totalChecked}/7`
+                });
+
+                // Clear current board values
                 habit.history = [false, false, false, false, false, false, false];
             });
+
             saveState();
             render();
         }
     }
 
+    function clearAllArchive() {
+        if (confirm("Permanently wipe all historical archive logs? This cannot be undone.")) {
+            archive = [];
+            saveState();
+            render();
+        }
+    }
+
+    // Initial launch rendering pass
     render();
 </script>
 </body>
